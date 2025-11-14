@@ -1,0 +1,26 @@
+version: '3.5'
+services:  
+  postgres:
+      platform: 'linux/amd64'
+      image: postgres:latest
+      container_name: devops-backend-postgres-locall
+      environment:
+        - POSTGRES_USER=admin
+        - POSTGRES_PASSWORD=password123
+        - POSTGRES_DB=mydatabase
+      ports:
+        - '5432:5432'
+      volumes:
+        - devops-backend-postgres-locall:/var/lib/postgresql/data/
+      networks:
+        - elastic
+
+
+
+volumes:
+  devops-backend-postgres-locall:
+  esdata:
+
+networks:
+  elastic:
+    driver: bridge

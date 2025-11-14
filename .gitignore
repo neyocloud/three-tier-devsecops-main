@@ -1,0 +1,12 @@
+*.terraform
+__pycache__
+.DS_Store
+*.sqlite3
+venv
+
+
+/jenkins-server-terraform/.terraform.lock.hcl
+/jenkins-server-terraform/.terraform
+
+notes.txt
+.pem
