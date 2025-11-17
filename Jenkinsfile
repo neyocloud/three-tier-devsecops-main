@@ -8,7 +8,7 @@ pipeline {
         SONAR_TOKEN       = credentials('sonar-token')
 
         // ==== Docker Hub ====
-        // Push image: neyocicd/three-tier-devsecops-main:latest
+        // Resulting image: neyocicd/three-tier-devsecops-main:latest
         DOCKER_IMAGE = 'neyocicd/three-tier-devsecops-main'
         IMAGE_TAG    = 'latest'
 
@@ -46,13 +46,12 @@ pipeline {
         stage('SonarQube Scan') {
             steps {
                 sh '''
-                  sonar-scanner \
+                  /opt/sonar-scanner/bin/sonar-scanner \
                     -Dsonar.projectKey=$SONAR_PROJECT_KEY \
                     -Dsonar.host.url=$SONAR_HOST_URL
                 '''
             }
         }
-
 
         // ---------- DOCKER BUILD & PUSH ----------
         stage('Docker Build & Push') {
@@ -64,7 +63,7 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
-                    sh """
+                    sh '''
                       echo ">>> Logging in to Docker Hub as $DOCKER_USER"
                       echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
@@ -73,7 +72,7 @@ pipeline {
 
                       echo ">>> Pushing image"
                       docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
-                    """
+                    '''
                 }
             }
         }
