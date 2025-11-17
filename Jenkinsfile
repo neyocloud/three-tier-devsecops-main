@@ -1,14 +1,15 @@
 pipeline {
     agent any
 
+    tools {
+        sonarScanner 'sonar-scanner'
+    }
+
     environment {
         // ==== SonarQube ====
-        SONAR_HOST_URL    = 'http://sonar:9000'
         SONAR_PROJECT_KEY = 'three-tier-devsecops-main'
-        SONAR_TOKEN       = credentials('sonar-token')   // used via env by sonar-scanner
 
         // ==== Docker Hub ====
-        // Image: neyocicd/three-tier-devsecops-main:latest
         DOCKER_IMAGE = 'neyocicd/three-tier-devsecops-main'
         IMAGE_TAG    = 'latest'
 
@@ -41,17 +42,16 @@ pipeline {
             }
         }
 
-        // ---------- SONARQUBE SCAN (CLI in /opt) ----------
+        // ---------- SONARQUBE SCAN (using Jenkins tool + server config) ----------
         stage('SonarQube Scan') {
             steps {
-                sh '''
-                  echo ">>> Running SonarQube scan..."
-                  export SONAR_TOKEN="$SONAR_TOKEN"
-
-                  /opt/sonar-scanner/bin/sonar-scanner \
-                    -Dsonar.projectKey=$SONAR_PROJECT_KEY \
-                    -Dsonar.host.url=$SONAR_HOST_URL
-                '''
+                withSonarQubeEnv('sonar') {
+                    sh """
+                      echo ">>> Running SonarQube scan with server: \$SONAR_HOST_URL"
+                      sonar-scanner \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY}
+                    """
+                }
             }
         }
 
