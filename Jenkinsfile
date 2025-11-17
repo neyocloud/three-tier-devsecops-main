@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        sonarScanner 'sonar-scanner'
-    }
-
     environment {
         // ==== SonarQube ====
         SONAR_PROJECT_KEY = 'three-tier-devsecops-main'
@@ -42,15 +38,19 @@ pipeline {
             }
         }
 
-        // ---------- SONARQUBE SCAN (using Jenkins tool + server config) ----------
+        // ---------- SONARQUBE SCAN ----------
         stage('SonarQube Scan') {
             steps {
                 withSonarQubeEnv('sonar') {
-                    sh """
-                      echo ">>> Running SonarQube scan with server: \$SONAR_HOST_URL"
-                      sonar-scanner \
-                        -Dsonar.projectKey=${SONAR_PROJECT_KEY}
-                    """
+                    script {
+                        // Use Jenkins-managed SonarScanner installation
+                        def scannerHome = tool 'sonar-scanner'
+                        sh """
+                          echo ">>> Running SonarQube scan with server: \$SONAR_HOST_URL"
+                          "${scannerHome}/bin/sonar-scanner" \
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY}
+                        """
+                    }
                 }
             }
         }
