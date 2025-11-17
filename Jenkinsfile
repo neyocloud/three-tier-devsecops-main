@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // ==== SonarQube ====
-        SONAR_HOST_URL    = 'http://localhost:9000'
+        SONAR_HOST_URL    = 'http://sonar:9000'
         SONAR_PROJECT_KEY = 'three-tier-devsecops-main'
         SONAR_TOKEN       = credentials('sonar-token')
 
@@ -45,14 +45,14 @@ pipeline {
         // ---------- SONARQUBE SCAN ----------
         stage('SonarQube Scan') {
             steps {
-                sh """
+                sh '''
                   sonar-scanner \
-                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                    -Dsonar.host.url=${SONAR_HOST_URL} \
-                    -Dsonar.login=${SONAR_TOKEN}
-                """
+                    -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+                    -Dsonar.host.url=$SONAR_HOST_URL
+                '''
             }
         }
+
 
         // ---------- DOCKER BUILD & PUSH ----------
         stage('Docker Build & Push') {
