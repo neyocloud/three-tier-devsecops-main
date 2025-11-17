@@ -2,100 +2,101 @@ pipeline {
     agent any
 
     environment {
-        // SonarQube
-        SONAR_HOST_URL     = 'http://sonar:9000'
+        // ==== SonarQube ====
+        SONAR_HOST_URL    = 'http://sonar:9000'
+        SONAR_PROJECT_KEY = 'three-tier-devsecops-main'
+        SONAR_TOKEN       = credentials('sonar-token')   // used via env by sonar-scanner
 
-        // Docker
-        DOCKER_REGISTRY    = 'docker.io'
-        DOCKER_IMAGE_NAME  = 'neyocicd/three-tier-devsecops-main'  // change if your image name is different
+        // ==== Docker Hub ====
+        // Image: neyocicd/three-tier-devsecops-main:latest
+        DOCKER_IMAGE = 'neyocicd/three-tier-devsecops-main'
+        IMAGE_TAG    = 'latest'
 
-        // Kubernetes
-        K8S_NAMESPACE      = 'default'
+        // ==== Kubernetes ====
+        K8S_NAMESPACE = 'default'
+    }
+
+    options {
+        skipDefaultCheckout(true)
     }
 
     stages {
+
+        // ---------- CHECKOUT ----------
         stage('Checkout') {
             steps {
-                // Uses the job's SCM config (GitHub with git-cred)
-                checkout scm
+                git branch: 'main',
+                    url: 'https://github.com/neyocloud/three-tier-devsecops-main.git',
+                    credentialsId: 'git-cred'
             }
         }
 
+        // ---------- BUILD (placeholder) ----------
         stage('Build') {
             steps {
                 sh '''
-                  echo ">>> Build stage (customize for your app: tests, packaging, etc.)"
+                  echo ">>> Build stage (customize this for your app: npm, pip, etc.)"
                   ls -R
                 '''
             }
         }
 
+        // ---------- SONARQUBE SCAN (CLI in /opt) ----------
         stage('SonarQube Scan') {
             steps {
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    script {
-                        // Get path to the SonarQube Scanner tool configured in Jenkins
-                        def SCANNER_HOME = tool 'sonar-scanner'
+                sh '''
+                  echo ">>> Running SonarQube scan..."
+                  export SONAR_TOKEN="$SONAR_TOKEN"
 
-                        sh """
-                            ${SCANNER_HOME}/bin/sonar-scanner \
-                              -Dsonar.projectKey=three-tier-devsecops-main \
-                              -Dsonar.host.url=${SONAR_HOST_URL} \
-                              -Dsonar.login=${SONAR_TOKEN}
-                        """
-                    }
-                }
+                  /opt/sonar-scanner/bin/sonar-scanner \
+                    -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+                    -Dsonar.host.url=$SONAR_HOST_URL
+                '''
             }
         }
 
+        // ---------- DOCKER BUILD & PUSH ----------
         stage('Docker Build & Push') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'docker-cred',        // Docker Hub PAT
+                        credentialsId: 'docker-cred',
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
-                    // Use single-quoted Groovy string so secrets aren't interpolated by Groovy
                     sh '''
-                        echo ">>> Logging in to Docker Hub as $DOCKER_USER"
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin $DOCKER_REGISTRY
+                      echo ">>> Logging in to Docker Hub as $DOCKER_USER"
+                      echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                        echo ">>> Building image $DOCKER_IMAGE_NAME:latest"
-                        docker build -t $DOCKER_IMAGE_NAME:latest .
+                      echo ">>> Building image $DOCKER_IMAGE:$IMAGE_TAG"
+                      docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
 
-                        echo ">>> Tagging image with build number: $BUILD_NUMBER"
-                        docker tag $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:$BUILD_NUMBER
-
-                        echo ">>> Pushing images"
-                        docker push $DOCKER_IMAGE_NAME:latest
-                        docker push $DOCKER_IMAGE_NAME:$BUILD_NUMBER
-
-                        echo ">>> Docker logout"
-                        docker logout $DOCKER_REGISTRY || true
+                      echo ">>> Pushing image"
+                      docker push $DOCKER_IMAGE:$IMAGE_TAG
                     '''
                 }
             }
         }
 
+        // ---------- DEPLOY TO KUBERNETES ----------
         stage('Deploy to Kubernetes') {
-            when {
-                expression { currentBuild.currentResult == null || currentBuild.currentResult == 'SUCCESS' }
-            }
             steps {
                 withCredentials([
-                    file(credentialsId: 'k8-cred', variable: 'KUBECONFIG')   // kubeconfig file
+                    file(credentialsId: 'k8-cred', variable: 'KUBECONFIG')
                 ]) {
-                    sh """
-                        echo ">>> Using kubeconfig at: ${KUBECONFIG}"
-                        kubectl --kubeconfig=${KUBECONFIG} config set-context --current --namespace=${K8S_NAMESPACE}
-                        echo ">>> Applying Kubernetes manifests from kubernetes-manifests/"
-                        kubectl --kubeconfig=${KUBECONFIG} apply -f kubernetes-manifests/
-                    """
+                    sh '''
+                      echo ">>> Using kubeconfig at: $KUBECONFIG"
+
+                      echo ">>> Cluster nodes:"
+                      kubectl --kubeconfig=$KUBECONFIG get nodes
+
+                      echo ">>> Applying Kubernetes manifests from kubernetes-manifests/"
+                      kubectl --kubeconfig=$KUBECONFIG apply -f kubernetes-manifests/
+
+                      echo ">>> Pods in all namespaces:"
+                      kubectl --kubeconfig=$KUBECONFIG get pods -A
+                    '''
                 }
             }
         }
@@ -103,13 +104,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline succeeded – all stages completed."
+            echo "✅ Pipeline completed successfully!"
         }
         failure {
             echo "❌ Pipeline failed – check stage logs."
-        }
-        always {
-            echo "🏁 Pipeline finished with status: ${currentBuild.currentResult}"
         }
     }
 }
