@@ -2,10 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // SonarQube
-        SONAR_PROJECT_KEY = 'three-tier-devsecops-main'
-
-        // Docker image to build & push
+        // Docker image name in Docker Hub
         DOCKER_IMAGE = 'neyocicd/three-tier-devsecops-main'
     }
 
@@ -13,7 +10,6 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                // Uses the Git settings you configured in "Pipeline script from SCM"
                 checkout scm
             }
         }
@@ -21,7 +17,8 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                  echo ">>> Build stage (you can customize this later)"
+                  echo ">>> Build stage (placeholder)"
+                  echo "Current workspace content:"
                   ls -R
                 '''
             }
@@ -29,30 +26,24 @@ pipeline {
 
         stage('SonarQube Scan') {
             steps {
-                // "sonar" must match the name of the SonarQube server in Manage Jenkins → Configure System
+                // "sonar" must match the SonarQube server name in Manage Jenkins → System
                 withSonarQubeEnv('sonar') {
-                    // sonar-token is a Secret text credential with your Sonar token
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        script {
-                            // "sonar-scanner" must match the Tool name you configured in Jenkins (SonarScanner installation)
-                            def scannerHome = tool 'sonar-scanner'
-                            sh """
-                              echo ">>> Running SonarQube scan with server: \$SONAR_HOST_URL"
-                              "\${scannerHome}/bin/sonar-scanner" \
-                                -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} \
-                                -Dsonar.sources=. \
-                                -Dsonar.host.url=\$SONAR_HOST_URL \
-                                -Dsonar.login=\$SONAR_TOKEN
-                            """
-                        }
-                    }
+                    sh '''
+                      echo ">>> Running SonarQube scan with server: $SONAR_HOST_URL"
+
+                      /opt/sonar-scanner/bin/sonar-scanner \
+                        -Dsonar.projectKey=three-tier-devsecops-main \
+                        -Dsonar.sources=. \
+                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.login=$SONAR_AUTH_TOKEN
+                    '''
                 }
             }
         }
 
         stage('Docker Build & Push') {
             steps {
-                // docker-cred is "Username with password" (Docker Hub user + PAT)
+                // "docker-cred" = DockerHub PAT (username+password) credential
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'docker-cred',
@@ -65,7 +56,6 @@ pipeline {
                       echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
                       echo ">>> Building image $DOCKER_IMAGE:latest"
-                      # Backend Dockerfile lives in app-code/backend
                       docker build -t $DOCKER_IMAGE:latest -f app-code/backend/Dockerfile app-code/backend
 
                       echo ">>> Pushing image $DOCKER_IMAGE:latest"
@@ -77,7 +67,7 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                // k8-cred is a "Secret file" credential with your kind kubeconfig
+                // "k8-cred" = Secret file credential containing your kind kubeconfig
                 withCredentials([
                     file(credentialsId: 'k8-cred', variable: 'KUBECONFIG')
                 ]) {
@@ -87,7 +77,7 @@ pipeline {
                       echo ">>> Cluster nodes:"
                       kubectl --kubeconfig=$KUBECONFIG get nodes
 
-                      echo ">>> Applying Kubernetes manifests from kubernetes-manifests/ (recursively)"
+                      echo ">>> Applying Kubernetes manifests from kubernetes-manifests/ (recursive)"
                       kubectl --kubeconfig=$KUBECONFIG apply -R -f kubernetes-manifests/
 
                       echo ">>> Pods in all namespaces:"
@@ -100,10 +90,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline completed successfully.'
+            echo '✅ Pipeline succeeded – all stages passed.'
         }
         failure {
-            echo '❌ Pipeline failed – check stage logs.'
+            echo '❌ Pipeline failed – check the stage logs above.'
         }
     }
 }
