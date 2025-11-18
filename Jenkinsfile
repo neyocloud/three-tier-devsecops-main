@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         // ==== SonarQube ====
+        // Project key must exist in SonarQube
         SONAR_PROJECT_KEY = 'three-tier-devsecops-main'
 
         // ==== Docker Hub ====
@@ -14,6 +15,7 @@ pipeline {
     }
 
     options {
+        // we do our own git checkout
         skipDefaultCheckout(true)
     }
 
@@ -43,10 +45,10 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonar') {
                     script {
-                        // Use Jenkins-managed SonarScanner installation
+                        // use Jenkins-managed SonarScanner installation
                         def scannerHome = tool 'sonar-scanner'
                         sh """
-                          echo ">>> Running SonarQube scan with server: \$SONAR_HOST_URL"
+                          echo ">>> Running SonarQube scan with server: $SONAR_HOST_URL"
                           "${scannerHome}/bin/sonar-scanner" \
                             -Dsonar.projectKey=${SONAR_PROJECT_KEY}
                         """
@@ -69,10 +71,12 @@ pipeline {
                       echo ">>> Logging in to Docker Hub as $DOCKER_USER"
                       echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                      echo ">>> Building image $DOCKER_IMAGE:$IMAGE_TAG"
-                      docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
+                      echo ">>> Building image $DOCKER_IMAGE:$IMAGE_TAG from backend Dockerfile"
+                      docker build -t $DOCKER_IMAGE:$IMAGE_TAG \
+                        -f app-code/backend/Dockerfile \
+                        app-code/backend
 
-                      echo ">>> Pushing image"
+                      echo ">>> Pushing image $DOCKER_IMAGE:$IMAGE_TAG"
                       docker push $DOCKER_IMAGE:$IMAGE_TAG
                     '''
                 }
