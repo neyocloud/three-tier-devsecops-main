@@ -119,6 +119,26 @@ Make sure you have Docker installed on your system before proceeding (and Docker
 
 
 
+
+
+## Prerequisites & tested versions
+
+Docker Engine >= 20.10
+Docker Compose v2.x (docker compose)
+Git >= 2.25
+Node.js >= 16 (for building frontend/backend)
+npm >= 8
+Java 11+ (for Sonar Scanner if running in Jenkins)
+Jenkins LTS (run via image jenkins/jenkins:lts)
+kubectl (if deploying to Kubernetes) ARM / Apple Silicon (M1/M2) notes
+Prefer arm64 images when available. For images that do not provide arm64, use --platform linux/amd64 (may fail on pure arm hosts).
+Example: docker run --platform linux/amd64 ...
+For Jenkins Sonar Scanner on arm64, install the aarch64 scanner or run scanner in an agent that matches architecture.
+
+
+
+
+
 ## 2. Setting Up Jenkins for CI/CD
 
 Next, set up Jenkins, which will run our CI/CD pipeline.
@@ -595,49 +615,52 @@ Even with careful setup, you might encounter issues. Here are some common proble
 
 Jenkins Agent Disconnection: If you find that Jenkins jobs are failing because the agent (the Jenkins server itself or an external agent) disconnects, it could be due to resource constraints or a Java version mismatch. Ensure your Jenkins controller and any agents run the same Java version, as differing JDK versions are known to cause random disconnects
 community.jenkins.io
-. If Jenkins is running in a Docker container on an M1 Mac, ensure it’s the correct architecture image and has enough memory. Also check for network issues if using distributed agents. In our local setup (Jenkins running as a single container), you generally won’t have agent issues unless the container is underpowered. Allocating more CPU/RAM to the Docker Engine can help if Jenkins is slow or unstable during large builds.
 
-Prometheus Target Down: If Prometheus doesn’t show a target as UP, check the basics:
 
-Is the target container running? (e.g., is nodeexporter up?)
+Jenkins UI not reachable
+  docker ps | grep jenkins; docker logs jenkins
+  Ensure port 8080 not blocked; check jenkins_home permissions; restart container
+  
+Can't fetch initial admin password
+  docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 
-Is the target name and port in prometheus.yml correct? A typo in the hostname will cause “no such host” or the target just won’t appear.
 
-Networking: Prometheus must be able to reach the target. If you see “connection refused” or “host not found” errors in Prometheus, it means it cannot connect to that IP/port. Ensure both Prometheus and the target are on the same Docker network or otherwise reachable. For example, if you accidentally ran Node Exporter on the default Docker network and Prometheus on monitoring, Prometheus can’t resolve nodeexporter. The fix is to attach Node Exporter to monitoring (as we did).
+Prometheus target DOWN
+  Open Prometheus UI (http://localhost:9090) → Status → Targets; docker logs prometheus
+  docker exec -it prometheus sh -c "curl -s nodeexporter:9100/metrics" to test connectivity
 
-You can also exec into the Prometheus container (docker exec -it prometheus /bin/sh) and ping nodeexporter or curl nodeexporter:9100/metrics to test connectivity from inside the container.
 
-Grafana Cannot Connect to Prometheus: A common error when adding Prometheus as a data source in Grafana is: “Error reading Prometheus: dial tcp: lookup prometheus: no such host”. This means Grafana (in its container) cannot resolve the hostname you provided (in this case prometheus). The solution is to use the correct address:
+Grafana cannot connect to Prometheus
+ Ensure Grafana is on same Docker network; in Grafana set URL to http://prometheus:9090 or host.docker.internal if using host
 
-If both are on the same network (as we set up), use the Prometheus container’s name. Double-check that Grafana’s Docker run command had --network monitoring. If not, Grafana is isolated on its own network and won’t see the prometheus hostname.
 
-If you cannot put them on the same network for some reason, use the host’s address. For instance, on Docker Desktop, host.docker.internal can be used to have the container talk to the host machine’s ports
-grafana.com
-. In our case, since we published Prometheus on localhost:9090, using http://host.docker.internal:9090 in Grafana would make Grafana connect to the host (where Prometheus is listening).
+Backend cannot connect to MongoDB
+  docker network inspect monitoring; docker logs backend; ensure DB_HOST=mongodb and mongodb service name matches
 
-After adjusting the URL or networking, go back to Grafana’s data source settings and click Save & Test again. It should succeed if the connection details are correct.
 
-Docker Container Networking Issues: If the frontend can’t reach the backend, or backend can’t reach the database:
+Image build/push fails in Jenkins
+Check Docker credentials in Jenkins; test docker login manually; ensure Jenkins has Docker permissions or use Docker-in-Docker agent
 
-Ensure they are on the same Docker network (we used the monitoring network for all).
 
-Use container names or network aliases as hostnames. For example, our backend uses DB_HOST=mongodb. That works because the MongoDB container’s name is mongodb on the shared network. If you used a different network or forgot to connect one of the containers to it, the name won’t resolve.
 
-Check port mappings. We exposed MongoDB’s port to the host, but the backend, when inside Docker, doesn’t need the host port – it needs the container’s internal port. Since the MongoDB container listens on 27017 internally and the backend is on the same network, mongodb:27017 is correct. (The -e DB_PORT=27017 is actually not needed if the app defaults to 27017, but we included it for clarity.)
 
-For the frontend-backend connection: if the frontend is a single-page app served by Nginx, it might be making AJAX calls to an API. In a real deployment, you might configure the frontend with an environment variable or config file specifying the API base URL. In our local Docker case, one approach is to have the frontend container resolve the backend by name. If that’s not configured, you might run into CORS or connection issues. As a quick solution, you could serve the frontend on the host and let it call localhost:5000 for API, or adjust the frontend’s config to call http://backend:5000. This is application-specific, so adjust according to your project.
+##Security (minimal)
 
-Resource Constraints: Running all these components (Jenkins, the app, Prometheus, Grafana, etc.) can be heavy on a local machine. If you find containers are being OOM-killed (out-of-memory) or running extremely slowly:
 
-Stop any services you don’t need at the moment. For example, you don’t need two instances of the app (one from Jenkins deploy in K8s and another from manual Docker run) – just use one approach at a time.
+Do not commit tokens, passwords or sensitive files. Use Jenkins Credentials and .env.example (not .env) in repo.
 
-Give Docker Desktop more RAM/CPU if possible via its settings.
+Run containers as non-root where possible. Avoid apt-get into official Jenkins container — prefer agent images or custom images built from a 
+Dockerfile with required tools.
 
-Reduce Prometheus scrape frequency or retention if you’re concerned about it using too much memory (not likely an issue for this small setup).
+Limit resource usage with Docker Compose resource constraints or Kubernetes resource requests/limits.
 
-Jenkins can be memory-hungry, especially when doing Docker builds or running Java (SonarQube scanner is Java-based). Ensure your Docker Jenkins container has enough memory allocated. You might adjust the Java opts for Jenkins if needed.
+If you run registry pushes, use tokens or service accounts with least privilege.
 
-Most issues boil down to networking and configuration mismatches. By systematically checking logs and connectivity, you can resolve them. For example, if something isn’t working, inspect the container logs (docker logs <container>). The backend might log a database connection failure (indicating it couldn’t reach MongoDB), or Jenkins might log a permission error (if it couldn’t execute a tool like the Sonar scanner – which we fixed by using chmod). Each error message will guide you where to look.
+For  production, encrypt secrets and use a secrets manager (Vault, AWS Secrets Manager, etc.) or Kubernetes Secrets with proper RBAC.
+
+
+
+
 
 Usage
 
@@ -686,7 +709,13 @@ By following these steps, you have a mini-production environment on your local m
 
 
 
+## Verify:
 
+Frontend: http://localhost
+Backend: http://localhost:5000 (API)
+Jenkins: http://localhost:8080
+Prometheus: http://localhost:9090
+Grafana: http://localhost:3000
 
 
 
