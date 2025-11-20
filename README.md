@@ -79,7 +79,9 @@ To make learning even easier, This is a detailed guide, walking you through each
 
 
 
-Setup Instructions
+## Setup Instructions
+
+
 1. Cloning the Repository
 
 Begin by obtaining the project source code from the repository. Clone the Git repository to your local machine using Git:
@@ -712,9 +714,17 @@ By following these steps, you have a mini-production environment on your local m
 ## Verify:
 
 Frontend: http://localhost
+
+
 Backend: http://localhost:5000 (API)
+
+
 Jenkins: http://localhost:8080
+
+
 Prometheus: http://localhost:9090
+
+
 Grafana: http://localhost:3000
 
 
