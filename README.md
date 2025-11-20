@@ -41,21 +41,25 @@ Overall, this architecture ensures the application is delivered in a repeatable,
 
 
 
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/d1c0d7fc-7d3a-4a9a-a774-86c6afbb3e23" />
+<img width="1400" height="900" alt="image" src="https://github.com/user-attachments/assets/d1c0d7fc-7d3a-4a9a-a774-86c6afbb3e23" />
 
 
 
 
 
-Jenkins: Used as the Continuous Integration/Continuous Deployment tool. Jenkins Pipeline (defined in a Jenkinsfile) automates building the code, running tests, performing security scans, and deploying the application. Jenkins orchestrates the DevSecOps workflow end-to-end, from pulling code to pushing containers and deploying updates.
 
-Docker: Used for containerizing all parts of the application and infrastructure tools. Docker ensures environment consistency across deployments. We containerize the frontend, backend, and database, as well as Jenkins itself (running Jenkins in a Docker container), Prometheus, Grafana, etc. Docker Compose or Docker networks manage the multi-container setup and networking.
 
-Prometheus: Used for monitoring and metrics collection. Prometheus (running as a container) scrapes metrics from targets like Node Exporter (for host metrics) and possibly the application (if the app exposes a /metrics endpoint). Prometheus stores these time-series metrics and allows querying them via PromQL. This provides data on system performance (CPU usage, memory usage, etc.) and application behavior.
 
-Grafana: Used for metrics visualization and dashboards. Grafana (containerized) connects to Prometheus as a data source and displays the collected metrics on configurable dashboards. We use Grafana to visualize key metrics (e.g. server CPU load, memory usage, container status) to quickly identify issues. Grafana also supports setting up alerts on certain conditions (though in a local setup, this is mainly for demonstration).
 
-SonarQube (Scanner): Used for static code analysis and security scanning in the CI pipeline. In our Jenkins pipeline, there is a SonarQube scan stage that analyzes the code for bugs and vulnerabilities. We utilize the SonarQube Scanner CLI to run the analysis. (In a full setup, a SonarQube server would be running as a separate service or container – the pipeline sends analysis data to that server. Here we assume a SonarQube server is accessible at http://sonar:9000 as configured in the Jenkinsfile.)
+**Jenkins**: Used as the Continuous Integration/Continuous Deployment tool. Jenkins Pipeline (defined in a Jenkinsfile) automates building the code, running tests, performing security scans, and deploying the application. Jenkins orchestrates the DevSecOps workflow end-to-end, from pulling code to pushing containers and deploying updates.
+
+**Docker**: Used for containerizing all parts of the application and infrastructure tools. Docker ensures environment consistency across deployments. We containerize the frontend, backend, and database, as well as Jenkins itself (running Jenkins in a Docker container), Prometheus, Grafana, etc. Docker Compose or Docker networks manage the multi-container setup and networking.
+
+**Prometheus**: Used for monitoring and metrics collection. Prometheus (running as a container) scrapes metrics from targets like Node Exporter (for host metrics) and possibly the application (if the app exposes a /metrics endpoint). Prometheus stores these time-series metrics and allows querying them via PromQL. This provides data on system performance (CPU usage, memory usage, etc.) and application behavior.
+
+**Grafana**: Used for metrics visualization and dashboards. Grafana (containerized) connects to Prometheus as a data source and displays the collected metrics on configurable dashboards. We use Grafana to visualize key metrics (e.g. server CPU load, memory usage, container status) to quickly identify issues. Grafana also supports setting up alerts on certain conditions (though in a local setup, this is mainly for demonstration).
+
+**SonarQube (Scanner)**: Used for static code analysis and security scanning in the CI pipeline. In our Jenkins pipeline, there is a SonarQube scan stage that analyzes the code for bugs and vulnerabilities. We utilize the SonarQube Scanner CLI to run the analysis. (In a full setup, a SonarQube server would be running as a separate service or container – the pipeline sends analysis data to that server. Here we assume a SonarQube server is accessible at http://sonar:9000 as configured in the Jenkinsfile.)
 
 
 Additionally, other DevSecOps tools like Trivy (container vulnerability scanning) or Nexus (artifact repository) could be integrated, but the core focus here is on Jenkins, Docker, Prometheus, and Grafana. The SonarQube stage already covers code quality/security scanning in this project.)
@@ -80,7 +84,609 @@ Setup Instructions
 
 Begin by obtaining the project source code from the repository. Clone the Git repository to your local machine using Git:
 
+
 ```bash
 git clone https://github.com/neycloud/three-tier-devsecops-main.git
 cd three-tier-devsecops-main
+ ```
+
+This repository contains all the necessary code and configuration:
+
+
+
+Application source code for the frontend and backend (e.g. in an app-code/ directory).
+
+
+
+Dockerfiles for each component (to build container images for the frontend, backend, etc.).
+
+
+
+Jenkins pipeline definition (Jenkinsfile) and any Jenkins-specific scripts (possibly in a jenkins-pipeline/ directory).
+
+
+
+Infrastructure as code or deployment manifests (e.g. Kubernetes manifests in kubernetes-manifests/ for deploying to a cluster).
+
+
+
+Configuration for monitoring (e.g. a Prometheus config file, Docker Compose files if provided for Prometheus/Grafana/Node Exporter).
+
+
+
+Make sure you have Docker installed on your system before proceeding (and Docker Compose if you plan to use it). It’s also helpful to have Git and (if running Jenkins outside of Docker) a recent JDK installed, but in our case we will run Jenkins in a Docker container.
+
+
+
+
+## 2. Setting Up Jenkins for CI/CD
+
+Next, set up Jenkins, which will run our CI/CD pipeline.
+
+Launch Jenkins: The easiest way is via Docker.
+
+```
+docker run -d --name jenkins -p 8080:8080 -p 50000:50000 \
+  -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts
+```
+
+This starts Jenkins in a container, accessible on port 8080 (web UI) and 50000 (for agent connections). We use a named volume jenkins_home to persist Jenkins data (so configuration isn’t lost if the container restarts).
+
+Initial Setup: Once Jenkins is running, access the web UI at http://localhost:8080. Jenkins will ask for an initial admin password. You can retrieve this from the container log or from the file on the container. For example, run:
+
+
+```
+docker exec -it jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+This will print the one-time password (a long alphanumeric string). Copy that into the Jenkins UI to unlock it, then proceed with the setup. Install the recommended plugins when prompted.
+
+Install Required Plugins (and SonarQube Scanner): Ensure the following Jenkins plugins are installed for our pipeline:
+
+Pipeline and Pipeline: Stage View (for Jenkins Pipeline jobs).
+
+Git (for pulling from GitHub) – and optionally GitHub integration plugins if using webhooks.
+
+Docker Pipeline (if the pipeline will run Docker commands or use Docker agents).
+
+Blue Ocean (optional, for a nicer pipeline visualization UI).
+
+SonarQube Scanner for Jenkins (to integrate SonarQube scans in the pipeline). After installing this, go to Manage Jenkins > Configure System and add a SonarQube server configuration (URL and authentication token). Name this server (e.g. “SonarQubeServer”) for use in the pipeline. You’ll also need to add a Jenkins credential for the Sonar token (the pipeline uses credentials('sonar-token') which should match the ID of a secret text credential containing your SonarQube token).
+
+In addition to plugins, the pipeline will use the SonarQube Scanner CLI to perform code analysis. On Jenkins x86_64, the plugin can automatically download the scanner. However, if your Jenkins is running on an ARM64 system (e.g. Apple M1/M2 Mac), you may need to manually install an ARM-compatible scanner. 
+
+Below are the steps to install the SonarQube Scanner CLI inside the Jenkins container (for ARM64):
+
+Open a shell in the running Jenkins container as root: 
+
+```
+docker exec -u 0 -it jenkins bash
+```
+
+(The -u 0 flag runs the shell as root user, which is needed to install software in the container.)
+
+Inside the container, install necessary tools and download the ARM64 scanner:
+
+```
+apt-get update && apt-get install -y curl unzip
+cd /opt
+curl -LO https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-7.3.0.5189-linux-aarch64.zip
+unzip sonar-scanner-cli-7.3.0.5189-linux-aarch64.zip
+```
+
+
+The zip will extract a directory like sonar-scanner-7.3.0.5189-linux-aarch64. Rename it for convenience and set proper permissions:
+
+```
+mv sonar-scanner-7.3.0.5189-linux-aarch64 sonar-scanner
+chmod -R a+rx /opt/sonar-scanner
+```
+
+
+
+The chmod -R a+rx command makes all files in the scanner directory readable and executable by all users. This is important because Jenkins runs as a non-root user inside the container; without adjusting permissions, Jenkins might not be able to execute the scanner. By giving all users read/execute rights, we ensure the Jenkins user can run the sonar-scanner binaries.
+
+(Optional) Add a symlink to make the scanner easily accessible from the PATH:
+
+```
+ln -sf /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/sonar-scanner
+```
+This lets you simply call sonar-scanner from anywhere in the container.
+
+
+
+
+
+
+Exit the container shell (exit) and, for good measure, test that Jenkins can use the scanner. For example, you can trigger a build with a Sonar stage (as we’ll set up in the Jenkinsfile) or exec into the container as the Jenkins user to run /opt/sonar-scanner/bin/sonar-scanner -v. You should see the scanner’s version output, confirming it’s installed correctly.
+
+
+
+
+
+
+## Credentials Setup: In Jenkins, add any necessary credentials that the pipeline will use:
+
+<img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/f630cf94-294b-4076-816f-4cf64da2ab10" />
+
+
+**Git Credentials**: If your Git repository is private, add credentials (e.g. SSH key or username/password) so Jenkins can pull the code.
+
+**Docker Registry Credentials**: If the pipeline pushes images to Docker Hub (or another registry), configure credentials (username/password or token) in Jenkins and use with docker.withRegistry or via environment variables.
+
+**SonarQube Token**: As mentioned, add a Secret Text credential for SonarQube authentication (the token from your SonarQube server). Ensure the credential ID matches what the Jenkinsfile expects (sonar-token in our case).
+
+**Kubernetes Credentials**: If deploying to a Kubernetes cluster that requires authentication (for local clusters like Kind or Docker Desktop’s Kubernetes, Jenkins might be able to use the default kubeconfig), you may need to provide a kubeconfig file or token. In a simple local setup, Jenkins can just call kubectl assuming the kubeconfig is mounted or Jenkins container is configured to use the host’s kubeconfig.
+
+
+
+
+
+Create the Pipeline Job: In Jenkins, create a new Pipeline job for this project (e.g. name it “three-tier-devsecops-pipeline”). Configure it to pull the Jenkinsfile from the repo:
+
+<img width="1512" height="982" alt="image" src="https://github.com/user-attachments/assets/dfca31cd-73ee-4d7d-9061-7bd8cca8a475" />
+
+
+In the job config, under Pipeline, select “Pipeline script from SCM”.
+
+Choose Git as the SCM, and enter the repository URL (the one you cloned).
+
+
+
+<img width="1512" height="982" alt="image" src="https://github.com/user-attachments/assets/1a358192-aebe-4859-9960-9567ac79988a" />
+
+
+
+
+Set the branch to the appropriate branch (e.g. main).
+
+
+
+
+<img width="1512" height="982" alt="image" src="https://github.com/user-attachments/assets/00b364c3-8aed-46ec-8410-3de456e572b5" />
+
+
+
+
+Set the Script Path to the location of the Jenkinsfile (Jenkinsfile if it’s at the repo root).
+
+Save the job.
+
+Jenkins Pipeline Definition (Jenkinsfile): The Jenkinsfile in this project defines the stages of our CI/CD pipeline. It contains environment variables and sequential stages for build, scan, and deployment. Below is a simplified version of the Jenkinsfile for reference:
+
+
+
+```
+pipeline {
+    agent any
+
+    environment {
+        // ==== SonarQube ====
+        SONAR_HOST_URL    = 'http://sonar:9000'
+        SONAR_PROJECT_KEY = 'three-tier-devsecops-main'
+        SONAR_TOKEN       = credentials('sonar-token')
+
+        // ==== Docker Hub ====
+        // Image will be tagged as neyocicd/three-tier-devsecops-main:latest
+        DOCKER_IMAGE = 'neyocicd/three-tier-devsecops-main'
+        IMAGE_TAG    = 'latest'
+
+        // ==== Kubernetes ====
+        K8S_NAMESPACE = 'default'
+    }
+
+    options {
+        // (Here you could set pipeline options if needed, e.g. skip stages on failure)
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Pull the latest code from Git
+                checkout scm
+            }
+        }
+        stage('Build') {
+            steps {
+                // Example build commands for frontend and backend
+                sh 'npm install && npm run build'
+                // (In practice, you might have separate build steps per component)
+            }
+        }
+        stage('SonarQube Scan') {
+            steps {
+                // Run SonarQube Scanner to analyze code
+                sh '/opt/sonar-scanner/bin/sonar-scanner'
+            }
+        }
+        stage('Docker Build & Push') {
+            steps {
+                // Build the Docker image and push to Docker Hub
+                sh 'docker build -t $DOCKER_IMAGE:$IMAGE_TAG .'
+                sh 'docker push $DOCKER_IMAGE:$IMAGE_TAG'
+            }
+        }
+        stage('Deploy to Kubernetes') {
+            steps {
+                // Deploy the updated application to the local K8s cluster
+                sh 'kubectl apply -n $K8S_NAMESPACE -f kubernetes-manifests/'
+            }
+        }
+    }
+
+    // (Optionally, post actions like notifications can be here)
+}
+
+```
+
+
+
+**The Jenkinsfile above outlines the key stages. The actual commands might differ based on your project structure (for example, you might build frontend and backend separately, or run tests, etc.), but this gives an idea of the pipeline flow. The SonarQube stage uses the scanner we installed to perform code analysis, and the Docker stage builds the app’s Docker image and pushes it to Docker Hub. Finally, the deploy stage applies Kubernetes manifests to run the new version of the app.*
+
+
+
+**Run the Pipeline**: Once the Jenkins job is configured, trigger a build (click “Build Now” in Jenkins). Jenkins will pull the code and execute the pipeline stages in order. Monitor the console output in Jenkins to follow along each stage. If everything is set up correctly, all stages should succeed. You’ll have a built application, a SonarQube scan report (viewable in your SonarQube server if configured), a Docker image pushed to your registry, and the application deployed to your local Kubernetes (or local Docker environment).
+
+
+<img width="1450" height="646" alt="image" src="https://github.com/user-attachments/assets/e4432a4c-127d-4eb3-9b23-d3133f4d3d8f" />
+
+
+
+
+If the build fails, Jenkins will indicate which stage had an error. Common issues could be misconfigured credentials, failing tests, or Docker build errors. Check the logs for details in any failing stage. Once issues are fixed, you can run the pipeline again. After a successful run, you should see all stages marked with a green check in Jenkins. For example, a successful pipeline might show stages: Checkout → Build → SonarQube Scan → Docker Build & Push → Deploy, all completed. .......
+
+
+<img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/bd498274-5aad-4c10-856e-db68a4fd3d55" />
+
+
+
+In a real project, you might set this pipeline to trigger on each code push via webhooks. For now, manual triggering is fine for testing.
+
+
+
+
+
+
+
+## 3. Running the Application and Monitoring Containers
+
+
+
+
+
+
+With the pipeline run completed (or as an alternative to using Jenkins deployment), you can now ensure the application and monitoring stack are running locally using Docker. We will start the frontend, backend, database, Prometheus, Node Exporter, and Grafana containers. If you used the Jenkins pipeline with Kubernetes deploy, your app might already be running in a local cluster; but here we’ll describe how to run everything with plain Docker for simplicity.
+
+Create a Docker Network: To allow all containers to communicate easily by name, create a user-defined network (so Docker will handle DNS for containers on it):
+
+
+
+
+```
+docker network create monitoring
+```
+
+We’ll use the name “monitoring” for the network (you can choose another name).
+
+
+
+
+
+## Launch the Database (MongoDB):
+
+
+```
+docker run -d --name mongodb --network monitoring -p 27017:27017 mongo:latest
+```
+
+This runs a MongoDB container in detached mode. It attaches to our monitoring network and exposes port 27017 to the host (so you could connect to the DB at localhost:27017 if needed). The backend service will use the hostname mongodb (the container name) to connect on the internal Docker network.
+
+
+
+
+## Launch the Backend:
+
+```
+docker run -d --name backend --network monitoring -p 5000:5000 \
+  -e DB_HOST=mongodb -e DB_PORT=27017 \
+  neyocicd/three-tier-devsecops-main:latest
+```
+
+
+
+Replace the image name (neyocicd/three-tier-devsecops-main:latest) with the actual backend image if it’s different. We pass environment variables to tell the backend how to reach the database (here, DB_HOST=mongodb so it resolves the MongoDB container by name, and the default MongoDB port). This publishes the backend’s API on port 5000 of the host (so you can reach the API at http://localhost:5000).
+
+## Launch the Frontend:
+
+```
+docker run -d --name frontend --network monitoring -p 80:80 \
+  neyocicd/frontend-image:latest
+```
+
+
+Replace neyocicd/frontend-image:latest with your actual frontend image name/tag if it differs. We map the container’s port 80 to host port 80, so the web UI will be accessible at http://localhost. (If your frontend container listens on a different port internally, adjust the ports accordingly. For example, if it’s a development server on 3000, use -p 80:3000 to map it to host port 80).
+
+**At this point, the three-tier application containers (frontend, backend, database) should be up and connected via the monitoring network:*
+
+The backend can resolve mongodb and connect to the database.
+
+The frontend can make API requests to the backend. (If the frontend needs to know how to reach the backend, ensure it’s configured to use the correct base URL. Since we exposed backend on localhost:5000, the frontend (running in a container) might need to call the backend at http://backend:5000 if it’s networked, or you might configure it to use http://localhost:5000 for simplicity if you’re accessing the frontend via your browser on the host. This depends on how the frontend is implemented; for a containerized frontend, using the container name backend is a common approach.)
+
+
+
+
+
+## Launch Prometheus and Node Exporter (Monitoring):
+
+First, prepare a Prometheus configuration file on your host (call it prometheus.yml). This config will tell Prometheus what targets to scrape. For example:
+
+
+
+
+```
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']    # Prometheus scrapes itself
+
+  - job_name: nodeexporter
+    static_configs:
+      - targets: ['nodeexporter:9100'] # Scrape Node Exporter container
+
+```
+
+
+This config has Prometheus scrape itself (so we get metrics on Prometheus’ performance) and scrape the Node Exporter on port 9100. Make sure the job_name and target hostnames match what we will run (we will name the Node Exporter container nodeexporter).
+
+
+
+Now run the Prometheus container:
+
+```
+docker run -d --name prometheus --network monitoring -p 9090:9090 \
+  -v $PWD/prometheus.yml:/etc/prometheus/prometheus.yml \
+  prom/prometheus:latest
+```
+
+
+
+
+<img width="1512" height="982" alt="image" src="https://github.com/user-attachments/assets/b58cb076-4fe2-4dc0-aae6-7453f74027a5" />
+
+
+
+
+We attach Prometheus to the same monitoring network and mount our config file into the container. Prometheus UI will be available on http://localhost:9090.
+
+Run the Node Exporter container:
+
+
+```
+docker run -d --name nodeexporter --network monitoring -p 9100:9100 \
+  prom/node-exporter:latest
+```
+
+
+Node Exporter exposes host metrics on port 9100. We attached it to monitoring network so that Prometheus can resolve the hostname nodeexporter as configured. (Note: Node Exporter by default looks at the filesystem to read system metrics. In this simple setup, it will be reporting on the container’s view. For a more accurate host monitoring on Linux, you could run Node Exporter with --net=host and appropriate mounts, but that’s beyond scope here.)
+
+**Run the Grafana container**:
+
+```
+docker run -d --name grafana --network monitoring -p 3000:3000 grafana/grafana:latest
+```
+
+
+Grafana will be available at http://localhost:3000 (default login is admin/admin, which you’ll change on first login). By connecting Grafana to Prometheus (next step), we’ll be able to visualize the metrics.
+
+
+
+<img width="1512" height="982" alt="image" src="https://github.com/user-attachments/assets/b06359e5-892c-4116-9141-d426c5a110fc" />
+
+
+
+
+After executing the above, all components of the stack should be running as Docker containers. You can verify by running docker ps (you should see containers for frontend, backend, mongodb, prometheus, nodeexporter, grafana, and jenkins). All services are now up and networked together. For instance, Prometheus and Grafana are on the monitoring network along with Node Exporter and our app, which means Prometheus can reach Node Exporter by name, and Grafana can reach Prometheus by name.
+
+(If you orchestrated the deployment via Kubernetes, the pods would be running in your cluster instead. In that case, Prometheus and Grafana could also be set up in the cluster. This guide uses Docker for simplicity, but the monitoring principles apply the same way in Kubernetes.)
+
+## 4. Configuring Prometheus Scrape Targets
+
+Prometheus needs to know which endpoints to scrape for metrics. We already provided a basic prometheus.yml configuration with two scrape targets: Prometheus itself and the Node Exporter. Once Prometheus is running, you can verify it has picked up the targets by checking its interface:
+
+Open the Prometheus UI by visiting http://localhost:9090 in your browser.
+
+In the top menu, go to Status > Targets. You should see the configured targets:
+
+One for prometheus (targeting localhost:9090) which should show as UP.
+
+One for nodeexporter (targeting nodeexporter:9100) which should also be UP if Prometheus can reach the Node Exporter container.
+
+You should see both targets listed and their state as UP. For example, Prometheus will report the last scrape time and any scrape errors here. If a target is misconfigured or unreachable, it would show as DOWN.
+
+To further test, you can use Prometheus’s Graph feature to query some metrics:
+
+Click Graph, then in the query box type up and hit Execute. This will show a line for each target with value 1 if it’s up (you should see a result for “prometheus” and “nodeexporter” jobs).
+
+Try querying something like node_memory_MemAvailable_bytes (if using Node Exporter) to see the current available memory on your system as reported by Node Exporter.
+
+Prometheus Targets Status: After configuration, the Targets page in Prometheus will list our two jobs. For example, it might show:
+
+
+<img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/67d4d57c-e214-4a3e-bb3b-185f9e827fb8" />
+
+
+
+job: prometheus endpoint: http://localhost:9090/metrics state: UP
+
+job: nodeexporter endpoint: http://nodeexporter:9100/metrics state: UP
+
+This confirms Prometheus is successfully scraping itself and the Node Exporter. If any target was down (state would be DOWN with an error message), double-check that the container is running and the hostname/port in prometheus.yml is correct. In our case, because Grafana and Prometheus are on the same Docker network as Node Exporter, and we used the service name nodeexporter, it resolves correctly. (If you see an error like “address not found” for nodeexporter, it means the networking isn’t set up – ensure you used --network monitoring for all relevant containers.)
+
+If your application itself exposes metrics (for instance, if the backend had a /metrics endpoint for Prometheus), you could add another job in the Prometheus config to scrape it. For example, if the backend on port 5000 provides metrics, you’d add a job with target backend:5000. By default, our setup only captures system metrics and Prometheus’ own metrics.
+
+
+
+## 5. Setting Up Grafana and Creating Dashboards
+
+With Prometheus collecting data, we can visualize it using Grafana.
+
+Access Grafana: Navigate to http://localhost:3000 and log in (default creds: admin/admin, then set a new password).
+
+Add Prometheus Data Source: Grafana needs to know about our Prometheus server:
+
+
+
+
+<img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/efae2a21-130a-4b7f-89c9-43eafc15726f" />
+
+
+
+
+
+
+Click the gear icon (Settings) on the left sidebar, and choose Data Sources.
+
+Click Add data source, then select Prometheus from the list.
+
+In the Prometheus configuration:
+
+Set the Name (e.g. Prometheus or prometheus-1).
+
+Set the URL to Prometheus. Since Grafana is running in Docker on the same network as Prometheus, we can use the container name. For example: http://prometheus:9090. (If that doesn’t work due to networking, you could use http://localhost:9090 if Prometheus is exposed to the host. Remember that inside the Grafana container, localhost:9090 would refer to Grafana itself, not the host, unless you use special DNS. In Docker Desktop environments, you can use http://host.docker.internal:9090 to reference the host machine’s Prometheus port
+grafana.com
+.)
+
+Leave other settings default and click Save & Test. You should see a “Data source is working” message.
+
+Grafana is now connected to Prometheus. If Grafana has trouble connecting (e.g., a network error), check that the URL is correct:
+
+If you see an error like “No such host” or “connection refused”, it likely means Grafana cannot resolve the hostname or reach the address. Ensure Grafana and Prometheus are on the same Docker network so that the hostname works. The special hostname host.docker.internal (on Docker for Mac/Windows) can be used as a last resort to point to the host’s Prometheus port if you bound Prometheus to the host
+grafana.com
+. For example, use http://host.docker.internal:9090 if Prometheus is reachable on the host but not via container DNS.
+
+If using container names, double-check the spelling and network. In our setup, because we used the monitoring network and named the container “prometheus”, the URL http://prometheus:9090 should work from Grafana. If it didn’t, one fix would be to join Grafana to that network (--network monitoring which we did). Once fixed, click Save & Test again until it says it’s working.
+
+Create or Import a Dashboard: Now the fun part – visualize the metrics.
+
+Grafana allows you to import pre-built dashboards from its community. For example, to monitor system metrics from Node Exporter, you can use the official Node Exporter Full dashboard. In Grafana, click + (Create) > Import, enter the dashboard ID (for Node Exporter Full, it’s 1860), and click Load. Select your Prometheus data source when prompted, and import it. You’ll get a comprehensive dashboard of CPU, memory, disk, and network graphs using the Node Exporter metrics.
+
+You can also create your own dashboard: click + (Create) > Dashboard, then Add new panel. In the panel editor, select a metric from Prometheus and a visualization type. For example, to see CPU load, you might use a query like avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) (which shows average CPU usage across cores). Customize the graph as needed and save the dashboard.
+
+Once imported or created, you should see live graphs updating. Grafana dashboards can be changed to different time ranges (upper right corner) – try setting to “Last 5 minutes” or “Last 1 hour” to see recent data. If you imported the Node Exporter Full dashboard, you’ll see panels for things like CPU usage, Memory usage, Filesystem usage, etc., all updating in real time as Prometheus scrapes metrics. You can also set up alerts in Grafana for certain metrics (though that may require configuring an alert notifier).
+
+At this point, we have a fully operational local environment:
+
+Application (frontend, backend, DB) running in containers (or pods) – accessible at http://localhost (frontend) and performing its functions.
+
+CI/CD Pipeline automated via Jenkins – ready to build, test, and deploy new changes.
+
+Monitoring via Prometheus and Grafana – giving us visibility into the system.
+
+
+
+
+
+## Common Errors and Troubleshooting
+
+Even with careful setup, you might encounter issues. Here are some common problems and how to address them:
+
+Jenkins Agent Disconnection: If you find that Jenkins jobs are failing because the agent (the Jenkins server itself or an external agent) disconnects, it could be due to resource constraints or a Java version mismatch. Ensure your Jenkins controller and any agents run the same Java version, as differing JDK versions are known to cause random disconnects
+community.jenkins.io
+. If Jenkins is running in a Docker container on an M1 Mac, ensure it’s the correct architecture image and has enough memory. Also check for network issues if using distributed agents. In our local setup (Jenkins running as a single container), you generally won’t have agent issues unless the container is underpowered. Allocating more CPU/RAM to the Docker Engine can help if Jenkins is slow or unstable during large builds.
+
+Prometheus Target Down: If Prometheus doesn’t show a target as UP, check the basics:
+
+Is the target container running? (e.g., is nodeexporter up?)
+
+Is the target name and port in prometheus.yml correct? A typo in the hostname will cause “no such host” or the target just won’t appear.
+
+Networking: Prometheus must be able to reach the target. If you see “connection refused” or “host not found” errors in Prometheus, it means it cannot connect to that IP/port. Ensure both Prometheus and the target are on the same Docker network or otherwise reachable. For example, if you accidentally ran Node Exporter on the default Docker network and Prometheus on monitoring, Prometheus can’t resolve nodeexporter. The fix is to attach Node Exporter to monitoring (as we did).
+
+You can also exec into the Prometheus container (docker exec -it prometheus /bin/sh) and ping nodeexporter or curl nodeexporter:9100/metrics to test connectivity from inside the container.
+
+Grafana Cannot Connect to Prometheus: A common error when adding Prometheus as a data source in Grafana is: “Error reading Prometheus: dial tcp: lookup prometheus: no such host”. This means Grafana (in its container) cannot resolve the hostname you provided (in this case prometheus). The solution is to use the correct address:
+
+If both are on the same network (as we set up), use the Prometheus container’s name. Double-check that Grafana’s Docker run command had --network monitoring. If not, Grafana is isolated on its own network and won’t see the prometheus hostname.
+
+If you cannot put them on the same network for some reason, use the host’s address. For instance, on Docker Desktop, host.docker.internal can be used to have the container talk to the host machine’s ports
+grafana.com
+. In our case, since we published Prometheus on localhost:9090, using http://host.docker.internal:9090 in Grafana would make Grafana connect to the host (where Prometheus is listening).
+
+After adjusting the URL or networking, go back to Grafana’s data source settings and click Save & Test again. It should succeed if the connection details are correct.
+
+Docker Container Networking Issues: If the frontend can’t reach the backend, or backend can’t reach the database:
+
+Ensure they are on the same Docker network (we used the monitoring network for all).
+
+Use container names or network aliases as hostnames. For example, our backend uses DB_HOST=mongodb. That works because the MongoDB container’s name is mongodb on the shared network. If you used a different network or forgot to connect one of the containers to it, the name won’t resolve.
+
+Check port mappings. We exposed MongoDB’s port to the host, but the backend, when inside Docker, doesn’t need the host port – it needs the container’s internal port. Since the MongoDB container listens on 27017 internally and the backend is on the same network, mongodb:27017 is correct. (The -e DB_PORT=27017 is actually not needed if the app defaults to 27017, but we included it for clarity.)
+
+For the frontend-backend connection: if the frontend is a single-page app served by Nginx, it might be making AJAX calls to an API. In a real deployment, you might configure the frontend with an environment variable or config file specifying the API base URL. In our local Docker case, one approach is to have the frontend container resolve the backend by name. If that’s not configured, you might run into CORS or connection issues. As a quick solution, you could serve the frontend on the host and let it call localhost:5000 for API, or adjust the frontend’s config to call http://backend:5000. This is application-specific, so adjust according to your project.
+
+Resource Constraints: Running all these components (Jenkins, the app, Prometheus, Grafana, etc.) can be heavy on a local machine. If you find containers are being OOM-killed (out-of-memory) or running extremely slowly:
+
+Stop any services you don’t need at the moment. For example, you don’t need two instances of the app (one from Jenkins deploy in K8s and another from manual Docker run) – just use one approach at a time.
+
+Give Docker Desktop more RAM/CPU if possible via its settings.
+
+Reduce Prometheus scrape frequency or retention if you’re concerned about it using too much memory (not likely an issue for this small setup).
+
+Jenkins can be memory-hungry, especially when doing Docker builds or running Java (SonarQube scanner is Java-based). Ensure your Docker Jenkins container has enough memory allocated. You might adjust the Java opts for Jenkins if needed.
+
+Most issues boil down to networking and configuration mismatches. By systematically checking logs and connectivity, you can resolve them. For example, if something isn’t working, inspect the container logs (docker logs <container>). The backend might log a database connection failure (indicating it couldn’t reach MongoDB), or Jenkins might log a permission error (if it couldn’t execute a tool like the Sonar scanner – which we fixed by using chmod). Each error message will guide you where to look.
+
+Usage
+
+With everything up and running, here’s how you can interact with the system:
+
+Frontend Application: Open your browser to http://localhost (assuming you mapped the frontend to port 80). You should see the web application’s frontend. This is the user interface of the three-tier app. Try using the app – for example, if it’s a demo blog or e-commerce app, navigate through pages or perform some action. The frontend will make API calls to the backend (in our setup, likely to http://localhost:5000 via the browser, or directly to http://backend:5000 if configured internally).
+
+Backend API: The backend is not directly accessed by end-users (the frontend uses it), but you can test it via API calls. For example, visit http://localhost:5000/api/health or whichever endpoint might exist to check if it returns a response. You can also use tools like curl or Postman to send requests to the backend. This can help verify that the backend can talk to the database and is functioning. Check the backend container logs (docker logs backend) for any runtime errors – it will log database connections or application errors if something is wrong.
+
+Jenkins Pipeline: Access the Jenkins UI at http://localhost:8080. You can see the pipeline job (e.g. “three-tier-devsecops-pipeline”) and its build history. If you click on a build and then Console Output, you can review the logs of each stage. After running the pipeline, you might also see results of the SonarQube scan in the console (and you can log into your SonarQube server to see the detailed report). If you commit new changes to the repo, you can trigger the pipeline again to go through the whole process (or set up webhook/auto triggers). Jenkins will continuously integrate and deliver your application with each change.
+
+Prometheus UI: While Grafana is the friendly way to view data, you can also use Prometheus’s web UI for quick queries or status. At http://localhost:9090, try querying some metrics or check Status > Targets as discussed. This interface is mostly for debugging and exploring metrics via PromQL.
+
+
+
+
+
+
+<img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/e27cb154-226f-4588-9b03-21a9c8407e49" />
+
+
+
+
+
+
+
+Grafana Dashboards: Go to http://localhost:3000 and view your dashboards. For instance, if you imported the Node Exporter Full dashboard, you’ll see panels like CPU usage (with per-core graphs), memory usage, network traffic, etc. This gives you real-time feedback on how your system is doing. If you stress-test your application (e.g. make many requests or use a load testing tool), you should see corresponding changes in the metrics (CPU usage rising, maybe memory or network I/O increasing, etc.). Grafana can be used to observe both the infrastructure and potentially application-level metrics (if you instrumented the app).
+
+
+
+
+
+<img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/0e87fd0f-8c1a-4a67-b7b6-2eebc617013a" />
+
+
+
+
+
+
+Stopping the Environment: To stop all containers, you can either stop them individually (docker stop <container>) or if you used Docker Compose, use docker-compose down. Since we ran containers individually, you’ll have to stop each or simply close Docker if you’re using Docker Desktop. Remember that the named volumes (like jenkins_home) and any data inside containers (like MongoDB data if not on a volume) will persist unless you remove them.
+
+Cleaning Up: If you want to remove everything, stop and remove the containers (docker rm -f jenkins frontend backend mongodb prometheus nodeexporter grafana). Also remove any named volumes if you want a fresh start (docker volume rm jenkins_home will wipe Jenkins data, and if you created a volume for MongoDB data, remove that too). Be careful with removing volumes as you will lose data (e.g., Jenkins configurations or database records). For a quick rebuild of the environment, it might be easier to keep volumes and just restart containers when needed.
+
+By following these steps, you have a mini-production environment on your local machine. You can develop your application, commit code, and watch Jenkins automatically build/test/deploy it. You can then observe the app’s behavior and performance via Grafana dashboards. This setup not only demonstrates DevSecOps principles (CI/CD, integrated security scanning, infrastructure as code), but also is a great sandbox for learning and improving the pipeline and monitoring before applying similar techniques to a cloud or production environment.
+
+
+
+
+
+
+
 
