@@ -141,6 +141,13 @@ three-tier-devsecops-main/
 **SonarQube (Scanner)**: Used for static code analysis and security scanning in the CI pipeline. In our Jenkins pipeline, there is a SonarQube scan stage that analyzes the code for bugs and vulnerabilities. We utilize the SonarQube Scanner CLI to run the analysis. (In a full setup, a SonarQube server would be running as a separate service or container – the pipeline sends analysis data to that server. Here we assume a SonarQube server is accessible at http://sonar:9000 as configured in the Jenkinsfile.)
 
 
+
+<img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/55e79752-d376-48dd-9ce0-2f48a0daf068" />
+
+
+
+
+
 Additionally, other DevSecOps tools like Trivy (container vulnerability scanning) or Nexus (artifact repository) could be integrated, but the core focus here is on Jenkins, Docker, Prometheus, and Grafana. The SonarQube stage already covers code quality/security scanning in this project.)
 
 
