@@ -250,14 +250,28 @@ Exit the container shell (exit) and, for good measure, test that Jenkins can use
 
 
 
+
 ### Jenkins credentials
 
-| ID               | Kind                   | Description                             | Used in (Jenkinsfile stage)      |
-|------------------|------------------------|-----------------------------------------|----------------------------------|
-| `dockerhub-cred` | Username with password | Docker Hub login for image push         | `Docker Build & Push`            |
-| `sonarqube-token`| Secret text            | Token for SonarQube code analysis       | `SonarQube Scan`                 |
-| `kubeconfig`     | Secret file            | Kubeconfig for deploying to cluster     | `Deploy to Kubernetes`           |
 
+Add the following credentials in Jenkins (Manage Jenkins → Credentials → System → Global credentials) so the pipeline can run:
+
+### 🔐 Jenkins Credentials
+
+| ID             | Kind                    | Description                                    | Used in Jenkinsfile                           |
+|----------------|-------------------------|------------------------------------------------|-----------------------------------------------|
+| 🟦 sonar-token | Secret text             | SonarQube authentication token                 | SonarQube Scan (`withSonarQubeEnv`)           |
+| 🟩 git-cred    | Secret text             | GitHub Personal Access Token (PAT)             | Checkout / Git pull from private repos        |
+| 🐳 docker-cred | Username with password  | Docker Hub credentials (username + PAT/token)  | Docker Build & Push                           |
+| ☸️ k8-cred     | Secret file             | `kubeconfig` for local Kubernetes / kind       | Deploy to Kubernetes                          |
+
+
+## Notes:
+
+- Do NOT commit tokens, secrets, or kubeconfig files to the repo. Use Jenkins credentials only.
+- Prefer least-privilege tokens and restrict credential scope (folder-level) where possible.
+- If any token or kubeconfig was exposed publicly, rotate it immediately and treat it as compromised.
+- Example: The Jenkinsfile expects these IDs (sonar-token, git-cred, docker-cred, k8-cred); ensure they match.
 
 **Double-check that each ID in the table matches the IDs used in the Jenkinsfile**
 
