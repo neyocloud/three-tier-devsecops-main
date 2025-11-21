@@ -69,6 +69,12 @@ It includes:
 
 ## Architecture
 
+
+
+<img width="2238" height="2048" alt="image" src="https://github.com/user-attachments/assets/206dad65-b667-4a93-8a08-fad6d37c57ac" />
+
+
+
 Three-Tier DevSecOps Full-Stack Web Application Deployment (Local with Docker, Prometheus, Grafana, and Jenkins): 
 
 This application is designed using a **clean three-tier architecture**, each tier running in its own container:
