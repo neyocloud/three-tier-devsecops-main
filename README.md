@@ -1,5 +1,4 @@
 
-# Three-Tier DevSecOps Full-Stack Web Application Deployment (Local with Docker, Prometheus, Grafana, and Jenkins)
 
 # Three-Tier DevSecOps Full-Stack Web Application Deployment  
  
