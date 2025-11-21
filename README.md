@@ -1,3 +1,55 @@
+
+# Three-Tier DevSecOps Full-Stack Web Application Deployment (Local with Docker, Prometheus, Grafana, and Jenkins)
+
+# Three-Tier DevSecOps Full-Stack Web Application Deployment  
+ 
+ ### Local Deployment using Docker • Jenkins • SonarQube • Prometheus • Grafana
+
+
+
+## 📘 Table of Contents
+ 
+ [Overview](#overview)
+ 
+ [Architecture](#architecture)
+ 
+ [Tools Used](#tools-used)
+ 
+ [Prerequisites](#prerequisites--tested-versions)
+ 
+ [Setup Instructions](#setup-instructions)
+ 
+ [Jenkins Credentials](#-jenkins-credentials)
+ 
+ [CI/CD Pipeline](#pipeline-definition-jenkinsfile)
+ 
+ [Running Locally (Docker)](#3-running-the-application-and-monitoring-containers)
+ 
+ [Prometheus & Grafana Setup](#4-configuring-prometheus-scrape-targets)
+ 
+ [Troubleshooting](#common-errors-and-troubleshooting)
+ 
+ [Security Notes](#security-minimal)
+ 
+ [Verify Services](#verify)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Three-Tier DevSecOps Full-Stack Web Application Deployment (Local with Docker, Prometheus, Grafana, and Jenkins)
 
 
