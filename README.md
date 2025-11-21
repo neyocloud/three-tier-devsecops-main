@@ -51,14 +51,27 @@
 ### Overview
 
 
-This project features a complete DevSecOps pipeline and local deployment for a three-tier web application (frontend, backend, database), which showcases how an application can be continually integrated, tested (with security scans), containerized, and deployed to your local machine using Docker with end-to-end monitoring via Prometheus and Grafana. The Jenkins CI/CD pipeline automates the build and deploy process (as well as the security scanning process with the SonarQube code analysis stage). When you follow this guide you will be able to replicate the production-like environment to your local machine with automated secured releases and real-time monitoring.
+This project provides a complete DevSecOps workflow for deploying a **three-tier web application** (frontend, backend, database) locally using Docker, fully automated through a **Jenkins CI/CD pipeline**.
+
+
+It includes:
+
+•✔ CI/CD 
+
+• ✔ Containerization 
+
+• ✔ Code Scanning 
+
+• ✔ Monitoring 
+
+• ✔ Automated Deployment
 
 
 ## Architecture
 
 Three-Tier DevSecOps Full-Stack Web Application Deployment (Local with Docker, Prometheus, Grafana, and Jenkins): 
 
-The application is divided into three tiers, each tier running in its own container. 
+This application is designed using a **clean three-tier architecture**, each tier running in its own container:
 
 The tiers are
 
@@ -77,8 +90,22 @@ Node Exporter: Exposes host machine metrics (CPU, memory, etc.) to Prometheus.
 
 Grafana: Connects to Prometheus to visualize metrics on dashboards. This provides insight into the health and performance of the application and infrastructure in real time.
 
-Overall, this architecture ensures the application is delivered in a repeatable, automated way (thanks to Jenkins and Docker), and that it’s observable via metrics (thanks to Prometheus and Grafana). Security is integrated by including steps like static code analysis in the pipeline (putting the “Sec” in DevSecOps).
+Overall, this architecture ensures the application is delivered in a repeatable, automated way (thanks to Jenkins and Docker), and that it’s observable via metrics (thanks to Prometheus and Grafana).
 
+
+## 📁 Project Structure (File Map)
+
+
+```
+three-tier-devsecops-main/
+│── app-code/
+│   ├── frontend/
+│   └── backend/
+│── kubernetes-manifests/
+│── monitoring/prometheus.yml
+│── Jenkinsfile
+│── docker-compose.yml   (added for simplified local deploy)
+```
 
 
 
@@ -833,19 +860,15 @@ By following these steps, you have a mini-production environment on your local m
 
 ## Verify:
 
-Frontend: http://localhost
-
-
-Backend: http://localhost:5000 ......API
-
-
-Jenkins: http://localhost:8080
-
-
-Prometheus: http://localhost:9090
-
-
-Grafana: http://localhost:3000
+ Frontend → http://localhost  
+ 
+ Backend API → http://localhost:5000 
+ 
+ Jenkins → http://localhost:8080  
+ 
+ Prometheus → http://localhost:9090  
+ 
+ Grafana → http://localhost:3000  
 
 
 
