@@ -234,6 +234,8 @@ Exit the container shell (exit) and, for good measure, test that Jenkins can use
 
 ## Credentials Setup: In Jenkins, add any necessary credentials that the pipeline will use:
 
+
+
 <img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/f630cf94-294b-4076-816f-4cf64da2ab10" />
 
 
@@ -246,6 +248,18 @@ Exit the container shell (exit) and, for good measure, test that Jenkins can use
 **Kubernetes Credentials**: If deploying to a Kubernetes cluster that requires authentication (for local clusters like Kind or Docker Desktop’s Kubernetes, Jenkins might be able to use the default kubeconfig), you may need to provide a kubeconfig file or token. In a simple local setup, Jenkins can just call kubectl assuming the kubeconfig is mounted or Jenkins container is configured to use the host’s kubeconfig.
 
 
+
+
+### Jenkins credentials
+
+| ID               | Kind                   | Description                             | Used in (Jenkinsfile stage)      |
+|------------------|------------------------|-----------------------------------------|----------------------------------|
+| `dockerhub-cred` | Username with password | Docker Hub login for image push         | `Docker Build & Push`            |
+| `sonarqube-token`| Secret text            | Token for SonarQube code analysis       | `SonarQube Scan`                 |
+| `kubeconfig`     | Secret file            | Kubeconfig for deploying to cluster     | `Deploy to Kubernetes`           |
+
+
+**Double-check that each ID in the table matches the IDs used in the Jenkinsfile**
 
 
 
