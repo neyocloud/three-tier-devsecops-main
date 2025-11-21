@@ -88,7 +88,12 @@ Begin by obtaining the project source code from the repository. Clone the Git re
 
 
 ```bash
+
 git clone https://github.com/neycloud/three-tier-devsecops-main.git
+
+```
+
+```
 cd three-tier-devsecops-main
  ```
 
@@ -152,7 +157,7 @@ docker run -d --name jenkins -p 8080:8080 -p 50000:50000 \
   -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts
 ```
 
-This starts Jenkins in a container, accessible on port 8080 (web UI) and 50000 (for agent connections). We use a named volume jenkins_home to persist Jenkins data (so configuration isn’t lost if the container restarts).
+This starts Jenkins in a container, accessible on port 8080 (web UI) and 50000 for agent connections. We use a named volume jenkins_home to persist Jenkins data (so configuration isn’t lost if the container restarts).
 
 Initial Setup: Once Jenkins is running, access the web UI at http://localhost:8080. Jenkins will ask for an initial admin password. You can retrieve this from the container log or from the file on the container. For example, run:
 
@@ -163,9 +168,9 @@ docker exec -it jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 
 This will print the one-time password (a long alphanumeric string). Copy that into the Jenkins UI to unlock it, then proceed with the setup. Install the recommended plugins when prompted.
 
-Install Required Plugins (and SonarQube Scanner): Ensure the following Jenkins plugins are installed for our pipeline:
+Install Required Plugins and SonarQube Scanner: Ensure the following Jenkins plugins are installed for our pipeline:
 
-Pipeline and Pipeline: Stage View (for Jenkins Pipeline jobs).
+Pipeline and Pipeline: Stage View for Jenkins Pipeline jobs.
 
 Git (for pulling from GitHub) – and optionally GitHub integration plugins if using webhooks.
 
@@ -173,7 +178,7 @@ Docker Pipeline (if the pipeline will run Docker commands or use Docker agents).
 
 Blue Ocean (optional, for a nicer pipeline visualization UI).
 
-SonarQube Scanner for Jenkins (to integrate SonarQube scans in the pipeline). After installing this, go to Manage Jenkins > Configure System and add a SonarQube server configuration (URL and authentication token). Name this server (e.g. “SonarQubeServer”) for use in the pipeline. You’ll also need to add a Jenkins credential for the Sonar token (the pipeline uses credentials('sonar-token') which should match the ID of a secret text credential containing your SonarQube token).
+SonarQube Scanner for Jenkins just to integrate SonarQube scans in the pipeline. After installing this, go to Manage Jenkins > Configure System and add a SonarQube server configuration (URL and authentication token). Name this server e.g. “SonarQubeServer” for use in the pipeline. You’ll also need to add a Jenkins credential for the Sonar token the pipeline uses credentials('sonar-token') which should match the ID of a secret text credential containing your SonarQube token.
 
 In addition to plugins, the pipeline will use the SonarQube Scanner CLI to perform code analysis. On Jenkins x86_64, the plugin can automatically download the scanner. However, if your Jenkins is running on an ARM64 system (e.g. Apple M1/M2 Mac), you may need to manually install an ARM-compatible scanner. 
 
@@ -442,7 +447,7 @@ We’ll use the name “monitoring” for the network (you can choose another na
 docker run -d --name mongodb --network monitoring -p 27017:27017 mongo:latest
 ```
 
-This runs a MongoDB container in detached mode. It attaches to our monitoring network and exposes port 27017 to the host (so you could connect to the DB at localhost:27017 if needed). The backend service will use the hostname mongodb (the container name) to connect on the internal Docker network.
+This runs a MongoDB container in detached mode. It attaches to our monitoring network and exposes port 27017 to the host so you could connect to the DB at localhost:27017 if needed. The backend service will use the hostname mongodb (the container name) to connect on the internal Docker network.
 
 
 
@@ -745,9 +750,9 @@ Grafana Dashboards: Go to http://localhost:3000 and view your dashboards. For in
 
 Stopping the Environment: To stop all containers, you can either stop them individually (docker stop <container>) or if you used Docker Compose, use docker-compose down. Since we ran containers individually, you’ll have to stop each or simply close Docker if you’re using Docker Desktop. Remember that the named volumes (like jenkins_home) and any data inside containers (like MongoDB data if not on a volume) will persist unless you remove them.
 
-Cleaning Up: If you want to remove everything, stop and remove the containers (docker rm -f jenkins frontend backend mongodb prometheus nodeexporter grafana). Also remove any named volumes if you want a fresh start (docker volume rm jenkins_home will wipe Jenkins data, and if you created a volume for MongoDB data, remove that too). Be careful with removing volumes as you will lose data (e.g., Jenkins configurations or database records). For a quick rebuild of the environment, it might be easier to keep volumes and just restart containers when needed.
+Cleaning Up: If you want to remove everything, stop and remove the containers (docker rm -f jenkins frontend backend mongodb prometheus nodeexporter grafana). Also remove any named volumes if you want a fresh start (docker volume rm jenkins_home will wipe Jenkins data, and if you created a volume for MongoDB data, remove that too). Be careful with removing volumes as you will lose data e.g., Jenkins configurations or database records. For a quick rebuild of the environment, it might be easier to keep volumes and just restart containers when needed.
 
-By following these steps, you have a mini-production environment on your local machine. You can develop your application, commit code, and watch Jenkins automatically build/test/deploy it. You can then observe the app’s behavior and performance via Grafana dashboards. This setup not only demonstrates DevSecOps principles (CI/CD, integrated security scanning, infrastructure as code), but also is a great sandbox for learning and improving the pipeline and monitoring before applying similar techniques to a cloud or production environment.
+By following these steps, you have a mini-production environment on your local machine. You can develop your application, commit code, and watch Jenkins automatically build/test/deploy it. You can then observe the app’s behavior and performance via Grafana dashboards. This setup not only demonstrates DevSecOps principles CI/CD, integrated security scanning, infrastructure as code, but also is a great sandbox for learning and improving the pipeline and monitoring before applying similar techniques to a cloud or production environment.
 
 
 
@@ -757,7 +762,7 @@ By following these steps, you have a mini-production environment on your local m
 Frontend: http://localhost
 
 
-Backend: http://localhost:5000 (API)
+Backend: http://localhost:5000 ......API
 
 
 Jenkins: http://localhost:8080
